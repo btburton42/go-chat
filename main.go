@@ -43,10 +43,25 @@ func main() {
 		github.New("key", "secret", "http://localhost:8080/auth/callback/github"),
 		google.New("849666603288-jqc34ohf2l18uj77fjvvlilgbtrkvqgs.apps.googleusercontent.com", "D8l3XZ3o_E_uxOtlfMcQSI_u", "http://localhost:8080/auth/callback/google"),
 	)
-	r := newRoom()
+	r := newRoom(UseFileSystemAvatar)
 	http.Handle("/", MustAuth(&templateHandler{filename: "chat.html"}))
 	http.Handle("/login", &templateHandler{filename: "login.html"})
 	http.HandleFunc("/auth/", loginHandler)
+	http.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
+		http.SetCookie(w, &http.Cookie{
+			Name:   "auth",
+			Value:  "",
+			Path:   "/",
+			MaxAge: -1,
+		})
+		w.Header()["Location"] = []string{"/chat"}
+		w.WriteHeader(http.StatusTemporaryRedirect)
+	})
+	http.Handle("/upload", &templateHandler{filename: "upload.html"})
+	http.HandleFunc("/uploader", uploaderHandler)
+	http.Handle("/avatars/",
+		http.StripPrefix("/avatars/",
+			http.FileServer(http.Dir("./avatars"))))
 	http.Handle("/room", r)
 	go r.run()
 	log.Println("Starting web server on", *addr)

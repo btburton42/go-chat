@@ -1,9 +1,11 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
 	"github.com/stretchr/gomniauth"
 	"github.com/stretchr/objx"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -14,7 +16,7 @@ type authHandler struct {
 }
 
 func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if _, err := r.Cookie("auth"); err == http.ErrNoCookie {
+	if cookie, err := r.Cookie("auth"); err == http.ErrNoCookie || cookie.Value == "" {
 		// not authenticated
 		w.Header().Set("Location", "/login")
 		w.WriteHeader(http.StatusTemporaryRedirect)
@@ -38,6 +40,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	action := segs[2]
 	provider := segs[3]
 	switch action {
+
 	case "login":
 		provider, err := gomniauth.Provider(provider)
 		if err != nil {
@@ -49,6 +52,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Location", loginUrl)
 		w.WriteHeader(http.StatusTemporaryRedirect)
+
 	case "callback":
 		provider, err := gomniauth.Provider(provider)
 		if err != nil {
@@ -62,15 +66,26 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Fatalln("Error when trying to get user from", provider, "-", err)
 		}
+
+		m := md5.New()
+		io.WriteString(m, strings.ToLower(user.Name()))
+		userId := fmt.Sprintf("%x", m.Sum(nil))
+		// save some data
 		authCookieValue := objx.New(map[string]interface{}{
-			"name": user.Name(),
+			"userid":     userId,
+			"name":       user.Name(),
+			"avatar_url": user.AvatarURL(),
+			"email":      user.Email(),
 		}).MustBase64()
+
 		http.SetCookie(w, &http.Cookie{
 			Name:  "auth",
 			Value: authCookieValue,
 			Path:  "/"})
+
 		w.Header()["Location"] = []string{"/chat"}
 		w.WriteHeader(http.StatusTemporaryRedirect)
+
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprintf(w, "Auth action %s not suported", action)
