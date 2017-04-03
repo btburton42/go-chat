@@ -14,6 +14,13 @@ import (
 	"text/template"
 )
 
+// set the active Avatar implementation
+var avatars Avatar = TryAvatars{
+	UseFileSystemAvatar,
+	UseAuthAvatar,
+	UseGravatar,
+}
+
 type templateHandler struct {
 	once     sync.Once
 	filename string
@@ -43,7 +50,7 @@ func main() {
 		github.New("key", "secret", "http://localhost:8080/auth/callback/github"),
 		google.New("849666603288-jqc34ohf2l18uj77fjvvlilgbtrkvqgs.apps.googleusercontent.com", "D8l3XZ3o_E_uxOtlfMcQSI_u", "http://localhost:8080/auth/callback/google"),
 	)
-	r := newRoom(UseFileSystemAvatar)
+	r := newRoom(avatars)
 	http.Handle("/", MustAuth(&templateHandler{filename: "chat.html"}))
 	http.Handle("/login", &templateHandler{filename: "login.html"})
 	http.HandleFunc("/auth/", loginHandler)
